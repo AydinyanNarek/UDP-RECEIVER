@@ -16,15 +16,15 @@ volatile bool stopThreads = false;
 
 namespace 
 {
-    MessageManager* globalMessageProcessorPtr = nullptr;
+    MessageManager* globalMessageManagerPtr = nullptr;
 
     void signalHandler(int signum) 
     {
-        if (globalMessageProcessorPtr) {
+        if (globalMessageManagerPtr) {
             stopThreads = true;
             std::cout << "\nReceived signal: " << signum << ". Exiting gracefully." << std::endl << std::endl;
-            globalMessageProcessorPtr->stop();
-            globalMessageProcessorPtr->printResults();
+            globalMessageManagerPtr->stop();
+            globalMessageManagerPtr->printResults();
         }
 
         exit(signum);
@@ -88,11 +88,11 @@ int main(int argc, char* argv[]) try
         signal(SIGALRM, signalHandler);
 
 
-        MessageManager messageProcessor;
-        globalMessageProcessorPtr = &messageProcessor;
-        messageProcessor.start(cmd->second);
+        MessageManager messageManager;
+        globalMessageManagerPtr = &messageManager;
+        messageManager.start(cmd->second);
 
-        UDPReceiver udpReceiver(&messageProcessor);
+        UDPReceiver udpReceiver(&messageManager);
         udpReceiver.startReceiving(cmd->first);
     }
 

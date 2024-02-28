@@ -13,6 +13,7 @@ MessageManager::MessageManager()
 
 MessageManager::~MessageManager() 
 {
+    stop();
 }
 
 void MessageManager::start(int numThreads) 

@@ -12,6 +12,7 @@ MessageProcessor::MessageProcessor()
 
 MessageProcessor::~MessageProcessor()
 {
+    finalize();
 }
 
 void MessageProcessor::addMessage(const Message& message, size_t size)
