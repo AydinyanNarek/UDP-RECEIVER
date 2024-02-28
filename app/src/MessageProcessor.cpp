@@ -1,72 +1,59 @@
 #include "MessageProcessor.hpp"
 
-#include <iostream>
-#include <cstring>
+extern volatile bool stopThreads;
 
 #define ACCEPTABLE_MESSAGE_A_SIZE (MESSAGE_A_INDEX + INDEX_SIZE)
 #define ACCEPTABLE_MESSAGE_B_SIZE (MESSAGE_B_INDEX + INDEX_SIZE)
 
-MessageProcessor::MessageProcessor() 
-: stopThreads(false)
-, messageATotal(0)
-, messageATrigger(0)
-, messageBTotal(0)
-, messageBTrigger(0)
-, totalMessages(0)
-, totalProcessed(0) 
-{}
-
-MessageProcessor::~MessageProcessor() 
+MessageProcessor::MessageProcessor()
 {
-    joinWorkerThreads();
-    printResults();
+    startInternal();
 }
 
-void MessageProcessor::start(int numThreads) 
+MessageProcessor::~MessageProcessor()
 {
-    for (int i = 0; i < numThreads; ++i) {
-        workerThreads.emplace_back(&MessageProcessor::processMessages, this);
+}
+
+void MessageProcessor::addMessage(const Message& message, size_t size)
+{
+    messages.push({message, size});
+}
+
+void MessageProcessor::finalize()
+{    
+    if(processor.joinable()) {
+        processor.join();
     }
-}
 
-void MessageProcessor::joinWorkerThreads() 
-{
+    while (!messages.empty())
     {
-        std::unique_lock<std::mutex> lock(mutex);
-        stopThreads = true;
-        cv.notify_all();
+        auto [message, size] = messages.pop();
+        processMessage(message, size);
     }
+}
 
-    for (auto& thread : workerThreads) {
-        if (thread.joinable()) {
-            thread.join();
+const Results& MessageProcessor::getResults() const
+{
+    return results;
+}
+
+void MessageProcessor::startInternal()
+{
+    processor = std::thread(&MessageProcessor::process, this);
+}
+
+void MessageProcessor::process()
+{
+    while (!stopThreads)
+    {
+        if(!messages.empty()) {
+            auto [message, size] = messages.pop();
+            processMessage(message, size);
         }
     }
 }
 
-void MessageProcessor::processMessageAsync(const Message& message, ssize_t bytesRead) 
-{   
-    ++totalMessages;
-    if (bytesRead <= 1) {
-        std::cout << "Error receiving from socket";
-    }else {
-        std::unique_lock<std::mutex> lock(mutex);
-        messageQueue.emplace_back(message, bytesRead);
-        cv.notify_one();
-    }
-}
-
-void MessageProcessor::printResults() 
-{
-    std::cout << "messageATotal: " << messageATotal << std::endl;
-    std::cout << "messageATrigger: " << messageATrigger << std::endl << std::endl;
-    std::cout << "messageBTotal: " << messageBTotal << std::endl;
-    std::cout << "messageBTrigger: " << messageBTrigger << std::endl << std::endl;
-    std::cout << "TotalMessages: " << totalMessages << std::endl;
-    std::cout << "TotalProcessed: " << totalProcessed << std::endl;
-}
-
-void MessageProcessor::processMessage(const Message& message, ssize_t bytesRead) 
+void MessageProcessor::processMessage(const Message& message, size_t bytesRead) 
 {
     auto type = message.getType();
 
@@ -76,40 +63,21 @@ void MessageProcessor::processMessage(const Message& message, ssize_t bytesRead)
         processMessageB(message.getIndexData(type));
     }
 
-    ++totalProcessed;
+    ++results.totalProcessed;
 }
 
 void MessageProcessor::processMessageA(uint64_t index) 
 {
-    ++messageATotal;
+    ++results.messageATotal;
     if (index % 1024 == 0) {
-        ++messageATrigger;
+        ++results.messageATrigger;
     }
 }
 
 void MessageProcessor::processMessageB(uint64_t index) 
 {
-    ++messageBTotal;
+    ++results.messageBTotal;
     if (index % 1024 == 0) {
-        ++messageBTrigger;
-    }
-}
-
-void MessageProcessor::processMessages() 
-{
-    while (true) {
-        std::unique_lock<std::mutex> lock(mutex);
-        cv.wait(lock, [this] { return stopThreads || !messageQueue.empty(); });
-
-        if (stopThreads && messageQueue.empty()) {
-            break;
-        }
-
-        // Process the message
-        const auto [message, size] = messageQueue.front();
-        messageQueue.pop_front();
-        lock.unlock();
-
-        processMessage(message, size);
+        ++results.messageBTrigger;
     }
 }

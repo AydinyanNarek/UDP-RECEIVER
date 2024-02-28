@@ -1,12 +1,12 @@
 #ifndef UDP_RECEIVER_HPP
 #define UDP_RECEIVER_HPP
 
-class MessageProcessor;
+class MessageManager;
 
 class UDPReceiver final
 {
 public:
-    explicit UDPReceiver(MessageProcessor* processor);
+    explicit UDPReceiver(MessageManager* manager);
     ~UDPReceiver();
     void startReceiving(int port);
 
@@ -15,7 +15,7 @@ private:
 
 private:
     int socketFd;
-    MessageProcessor* messageProcessor;
+    MessageManager* messageManager;
 };
 
 #endif //UDP_RECEIVER_HPP

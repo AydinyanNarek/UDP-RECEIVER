@@ -1,6 +1,6 @@
 #include "UDPReceiver.hpp"
 #include "Message.hpp"
-#include "MessageProcessor.hpp"
+#include "MessageManager.hpp"
 
 #include <iostream>
 #include <cstring>
@@ -10,9 +10,9 @@
 #include <netinet/in.h>
 #include <array>
 
-UDPReceiver::UDPReceiver(MessageProcessor* processor) 
+UDPReceiver::UDPReceiver(MessageManager* manager) 
 : socketFd(-1)
-, messageProcessor(processor) 
+, messageManager(manager) 
 {}
 
 UDPReceiver::~UDPReceiver() 
@@ -49,6 +49,6 @@ void UDPReceiver::listenSocket() {
     Message message;
     while (true) {
         ssize_t bytesRead = recvfrom(socketFd, &message, message.size(), 0, reinterpret_cast<struct sockaddr*>(&clientAddress), &clientAddrLen);
-        messageProcessor->processMessageAsync(message, bytesRead);
+        messageManager->addMessage(message, bytesRead);
     }
 }
