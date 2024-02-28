@@ -1,6 +1,7 @@
 #include "UDPReceiver.hpp"
-#include "MessageProcessor.hpp"
+#include "MessageManager.hpp"
 
+#include <thread>
 #include <iostream>
 #include <signal.h>
 #include <optional>
@@ -11,16 +12,19 @@
 
 #define CC_NON               "\033[m\017"
 
+volatile bool stopThreads = false;
+
 namespace 
 {
-    MessageProcessor* globalMessageProcessorPtr = nullptr;
+    MessageManager* globalMessageManagerPtr = nullptr;
 
     void signalHandler(int signum) 
     {
-        if (globalMessageProcessorPtr) {
+        if (globalMessageManagerPtr) {
+            stopThreads = true;
             std::cout << "\nReceived signal: " << signum << ". Exiting gracefully." << std::endl << std::endl;
-            globalMessageProcessorPtr->joinWorkerThreads();
-            globalMessageProcessorPtr->printResults();
+            globalMessageManagerPtr->stop();
+            globalMessageManagerPtr->printResults();
         }
 
         exit(signum);
@@ -55,7 +59,6 @@ namespace
             int maxThreadCount = std::thread::hardware_concurrency();
             if (numThreads > maxThreadCount) {
                 std::cout << T_BOLD_CC_YELLOW "Warning:" CC_NON << "The optimal thread count can be up to " << maxThreadCount << std::endl;
-                numThreads = maxThreadCount;
             }
 
             res.emplace(port, numThreads);
@@ -85,11 +88,11 @@ int main(int argc, char* argv[]) try
         signal(SIGALRM, signalHandler);
 
 
-        MessageProcessor messageProcessor;
-        globalMessageProcessorPtr = &messageProcessor;
-        messageProcessor.start(cmd->second);
+        MessageManager messageManager;
+        globalMessageManagerPtr = &messageManager;
+        messageManager.start(cmd->second);
 
-        UDPReceiver udpReceiver(&messageProcessor);
+        UDPReceiver udpReceiver(&messageManager);
         udpReceiver.startReceiving(cmd->first);
     }
 

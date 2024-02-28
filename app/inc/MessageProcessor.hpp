@@ -2,48 +2,49 @@
 #define MESSAGE_PROCESSOR_HPP
 
 #include "Message.hpp"
+#include "RingBuffer.hpp"
 
-#include <vector>
-#include <thread>
-#include <mutex>
-#include <atomic>
-#include <deque>
-#include <condition_variable>
+#include "thread"
+#include <cstddef>
 
-class MessageProcessor final
+#define BUFF_SIZE 10000
+
+class MessageProcessor
 {
 public:
     MessageProcessor();
-    
-    MessageProcessor(const MessageProcessor&) = delete;
-    MessageProcessor& operator=(const MessageProcessor&) = delete;
-
     ~MessageProcessor();
 
-    void start(int numThreads);
-    void joinWorkerThreads();
-    void processMessageAsync(const Message& message, ssize_t bytesRead);
-
-    void printResults();
+    MessageProcessor(const MessageProcessor&) = delete;
+    MessageProcessor& operator=(const MessageProcessor&) = delete;
+    
+    void addMessage(const Message& message, size_t size);
+    void finalize();
+    
+    struct Results
+    {
+        uint64_t messageATotal = 0;
+        uint64_t messageATrigger = 0;
+        uint64_t messageBTotal = 0;
+        uint64_t messageBTrigger = 0;
+        uint64_t totalMessages = 0;
+        uint64_t totalProcessed = 0;
+    };
+    
+    const Results& getResults() const;
 
 private:
-    void processMessage(const Message& message, ssize_t bytesRead);
+    void startInternal();
+    void process();
+    void processMessage(const Message& message, size_t bytesRead);
     void processMessageA(uint64_t index);
     void processMessageB(uint64_t index);
-    void processMessages();
 
 private:
-    volatile bool stopThreads;
-    std::mutex mutex;
-    std::condition_variable cv;
-    std::atomic<uint64_t> messageATotal;
-    std::atomic<uint64_t> messageATrigger;
-    std::atomic<uint64_t> messageBTotal;
-    std::atomic<uint64_t> messageBTrigger;
-    std::atomic<uint64_t> totalMessages;
-    std::atomic<uint64_t> totalProcessed;
-    std::vector<std::thread> workerThreads;
-    std::deque<std::pair<Message, int>> messageQueue;  // Added for messageQueue
+    Results results;
+    std::thread processor;
+    RingBuffer<std::pair<Message, size_t>, BUFF_SIZE> messages;
 };
 
+using Results = MessageProcessor::Results;
 #endif //MESSAGE_PROCESSOR_HPP
